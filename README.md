@@ -12,4 +12,4 @@ ResolveOps acts as a Tier-1 support agent that can autonomously answer policy qu
 - **Deployment:** Hugging Face Spaces (Docker)
 
 ## 🚀 Getting Started
-*(Setup instructions will be added later)*
+*(Setup instructions will be added later.)*
