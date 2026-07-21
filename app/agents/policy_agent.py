@@ -11,8 +11,9 @@ from pypdf import PdfReader
 env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Initialize the Vector Database (In-Memory for our Agent layer)
-chroma_client = chromadb.Client()
+# Initialize the Vector Database (Persistent)
+chroma_db_path = str(Path(__file__).parent.parent.parent / "chroma_data")
+chroma_client = chromadb.PersistentClient(path=chroma_db_path)
 collection = chroma_client.get_or_create_collection(name="it_policies")
 
 def setup_vector_database():
@@ -101,10 +102,10 @@ if __name__ == "__main__":
     
     test_message = types.Content(
         role="user", 
-        parts=[types.Part(text="Who is the President of the United States?")]
+        parts=[types.Part(text="Can you explain the rules for setting up a VPN?")]
     )
     
-    print("👤 You: Who is the President of the United States?")
+    print("👤 You: Can you explain the rules for setting up a VPN?")
     
     for event in policy_runner.run(
         user_id="local_admin", 

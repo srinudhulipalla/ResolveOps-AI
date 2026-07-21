@@ -14,3 +14,6 @@ __pycache__/
 # IDE Settings
 .vscode/
 .idea/
+
+# Local Vector DB Cache
+chroma_data/
