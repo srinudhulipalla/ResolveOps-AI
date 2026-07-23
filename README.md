@@ -22,7 +22,7 @@ ResolveOps acts as an autonomous Tier-1 support agent designed to answer corpora
 * **LLM Engine:** Gemini latest models
 * **Backend Framework:** Python 3.11+ / FastAPI / Uvicorn
 * **Relational Database:** PostgreSQL (Hardware Inventory & Support Tickets)
-* **Vector Store:** ChromaDB (Policy PDF Embeddings)
+* **Vector Store:** ChromaDB (Policy PDF Embeddings from Gemini Cloud)
 * **Frontend:** Single Page Application (Vanilla HTML5 / Modern CSS / JavaScript)
 
 ---
