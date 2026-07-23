@@ -73,7 +73,7 @@
                 <div class="input-group">
                     <input type="password" id="password" placeholder="Password">
                 </div>
-                <button onclick="attemptLogin()">Login to Dashboard</button>
+                <button onclick="attemptLogin()">Login</button>
                 <p id="login-error" style="color: #dc3545; font-size: 0.85rem; display: none; margin-top: 1rem; text-align: center; font-weight: bold;"></p>
             </div>
         </div>
@@ -126,7 +126,7 @@
 
     <script>
         // Connect directly to our FastAPI server
-        const API_BASE = "http://127.0.0.1:8000/api";
+        const API_BASE = "/api";
         let currentSessionId = "";
 
         // Core Utility: 24-hour localized time formatter
@@ -184,7 +184,7 @@
             }
             
             // The route we just mounted in FastAPI
-            const STATIC_BASE = "http://127.0.0.1:8000/static/policies";
+            const STATIC_BASE = "/static/policies";
             
             policies.forEach(p => {
                 // 🚨 Updated: Real hyperlink that opens the PDF in a new browser tab

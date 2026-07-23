@@ -4,6 +4,7 @@ import psycopg2
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google.genai import types
@@ -37,6 +38,11 @@ app.mount("/static/policies", StaticFiles(directory=policies_path), name="polici
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+@app.get("/")
+def serve_index():
+    """Serves the frontend Single Page Application"""
+    return FileResponse("frontend/index.html")
 
 @app.post("/api/login")
 def login(request: LoginRequest):
