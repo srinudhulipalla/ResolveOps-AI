@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 # Import the orchestrator and policy database tools
 from app.agents.supervisor_agent import supervisor_runner
-from app.agents.policy_agent import setup_vector_database, collection
+from app.agents.policy_agent import ingest_documents
 
 # Load environment variables
 env_path = Path(__file__).parent.parent / ".env"
@@ -85,15 +85,11 @@ def get_policies():
     return [f.name for f in policies_dir.glob("*.pdf")]
 
 @app.post("/api/rebuild-db")
+@app.post("/api/rebuild-db")
 def rebuild_db():
-    """Wipes the existing ChromaDB vectors and re-indexes the PDFs."""
-    existing_data = collection.get()
-    if existing_data and existing_data['ids']:
-        collection.delete(ids=existing_data['ids'])
-    
-    # Re-run the ingestion pipeline from policy_agent.py
-    setup_vector_database()
-    return {"status": "success", "message": "Vector database rebuilt successfully!"}
+    """Wipes existing vectors and re-indexes PDFs directly."""
+    result = ingest_documents()
+    return result
 
 # --- 📊 Dashboard: Relational Data (PostgreSQL) ---
 @app.get("/api/inventory")

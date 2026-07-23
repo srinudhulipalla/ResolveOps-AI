@@ -6,79 +6,113 @@ from google.adk.runners import InMemoryRunner
 from google.genai import types
 import chromadb
 from pypdf import PdfReader
+import glob
+from chromadb.utils.embedding_functions import GoogleGeminiEmbeddingFunction
+from PyPDF2 import PdfReader
 
-# Force Python to load your .env file
-env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
-
-# Initialize the Vector Database (Persistent)
-chroma_db_path = str(Path(__file__).parent.parent.parent / "chroma_data")
-chroma_client = chromadb.PersistentClient(path=chroma_db_path)
-collection = chroma_client.get_or_create_collection(name="it_policies")
-
-def setup_vector_database():
-    """Reads PDFs, chunks the text, and stores them as mathematical vectors."""
-    policies_dir = Path(__file__).parent.parent.parent / "policies"
-    if not policies_dir.exists():
-        print("⚠️ Policies directory not found.")
-        return
-
-    pdf_files = list(policies_dir.glob("*.pdf"))
+# Dynamically route the GOOGLE_API_KEY to GEMINI_API_KEY so ChromaDB can find it
+if not os.getenv("GEMINI_API_KEY") and os.getenv("GOOGLE_API_KEY"):
+    os.environ["GEMINI_API_KEY"] = os.environ["GOOGLE_API_KEY"]
     
-    # Prevent re-loading if the DB is already populated
-    if collection.count() > 0:
-        return
+# 1. Setup Persistent Client
+CHROMA_PATH = "./chroma_data"
+client = chromadb.PersistentClient(path=CHROMA_PATH)
 
-    print(f"🔄 Processing {len(pdf_files)} PDFs into the Vector Database...")
-    
-    chunk_id = 0
-    for pdf_path in pdf_files:
-        reader = PdfReader(pdf_path)
-        for page_num, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if not text:
-                continue
-            
-            # Chunking strategy: split into roughly 150-word blocks
-            words = text.split()
-            chunk_size = 150
-            
-            for i in range(0, len(words), chunk_size):
-                chunk = " ".join(words[i:i + chunk_size])
-                
-                # Store the text, metadata (source file and page), and a unique ID
-                collection.add(
-                    documents=[chunk],
-                    metadatas=[{"source": pdf_path.name, "page": page_num + 1}],
-                    ids=[f"chunk_{chunk_id}"]
-                )
-                chunk_id += 1
-                
-    print(f"🎯 Successfully indexed {chunk_id} vector chunks in ChromaDB!\n")
+# 2. Configure the Google Gemini Cloud Embedding Function
+# It automatically securely reads the GEMINI_API_KEY from your .env file
+gemini_ef = GoogleGeminiEmbeddingFunction(
+    model_name="gemini-embedding-001",
+    task_type="RETRIEVAL_DOCUMENT"
+)
 
-# Run the ingestion pipeline when the agent boots
-setup_vector_database()
+def ingest_documents():
+    """
+    Reads PDFs from the policies folder, chunks them, and creates 
+    cloud embeddings via Gemini ONLY when called explicitly.
+    """
+    policy_dir = "policies"
+    if not os.path.exists(policy_dir):
+        return {"status": "error", "message": "Policies folder not found."}
 
-# Define the Tool the AI will use to search the database
-def search_policies(query: str) -> str:
-    """Searches the corporate IT policies for answers."""
-    print(f"\n[System Log] 🛠️ Agent is querying Vector DB for: '{query}'")
-    
-    # Retrieve the top 3 most relevant chunks based on the query
-    results = collection.query(
-        query_texts=[query],
-        n_results=3
+    # Delete existing collection if we are rebuilding to avoid duplicates
+    try:
+        client.delete_collection(name="it_policies")
+    except ValueError:
+        pass # Collection didn't exist yet, which is fine
+
+    # Create fresh collection enforcing the Gemini Embedding Engine
+    collection = client.create_collection(
+        name="it_policies",
+        embedding_function=gemini_ef
     )
     
-    if not results['documents'][0]:
-        return "No relevant policy information found."
+    documents = []
+    metadatas = []
+    ids = []
+    
+    # Read and chunk PDFs
+    pdf_files = glob.glob(os.path.join(policy_dir, "*.pdf"))
+    doc_id_counter = 1
+    
+    for pdf_path in pdf_files:
+        try:
+            reader = PdfReader(pdf_path)
+            filename = os.path.basename(pdf_path)
+            
+            for page_num, page in enumerate(reader.pages):
+                text = page.extract_text()
+                if text and text.strip():
+                    # Basic chunking: split by paragraphs or just store page-by-page
+                    # Here we store page-by-page for simplicity
+                    documents.append(text.strip())
+                    metadatas.append({"source": filename, "page": page_num + 1})
+                    ids.append(f"doc_{doc_id_counter}")
+                    doc_id_counter += 1
+        except Exception as e:
+            print(f"Error processing {pdf_path}: {e}")
+
+    # Send chunks to Gemini for embedding and save locally in ChromaDB
+    if documents:
+        collection.add(
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids
+        )
+        print(f"Successfully embedded {len(documents)} chunks using Gemini Cloud.")
+        return {"status": "success", "message": f"Embedded {len(documents)} document chunks."}
+    
+    return {"status": "warning", "message": "No text found to embed."}
+
+def search_policies(query_text: str, n_results: int = 3) -> str:
+    """
+    Agent Tool: Retrieves policies using the Gemini Cloud embedding function.
+    """
+    try:
+        collection = client.get_collection(
+            name="it_policies", 
+            embedding_function=gemini_ef
+        )
         
-    combined_results = ""
-    for i, doc in enumerate(results['documents'][0]):
-        metadata = results['metadatas'][0][i]
-        combined_results += f"\n--- Source: {metadata['source']} (Page {metadata['page']}) ---\n{doc}\n"
+        results = collection.query(
+            query_texts=[query_text],
+            n_results=n_results
+        )
         
-    return combined_results
+        if not results["documents"] or not results["documents"][0]:
+            return "No relevant policy documents found in the database."
+            
+        # Format the retrieved chunks for the LLM context
+        context = []
+        for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
+            context.append(f"[Source: {meta['source']}, Page: {meta['page']}]\n{doc}\n")
+            
+        return "\n---\n".join(context)
+        
+    except Exception as e:
+        return f"Error retrieving policies. The database might need to be rebuilt. Details: {e}"
+
+# IMPORTANT: Notice there is NO function call here at the bottom of the file.
+# The script will load without triggering the Gemini API.
 
 # Define the Specialized Policy Agent
 policy_agent = Agent(
