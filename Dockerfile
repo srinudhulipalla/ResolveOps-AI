@@ -1,5 +1,5 @@
-# Use Python 3.11 to satisfy dependencies requiring Python >= 3.11
-FROM python:3.11-slim
+# Use Python 3.12 to satisfy requirements pinned for Python >= 3.12
+FROM python:3.12-slim
 
 # Create a non-root user for security best practices
 RUN useradd -m -u 1000 user
