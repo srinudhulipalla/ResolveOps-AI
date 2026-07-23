@@ -1,5 +1,5 @@
-# Use the official Python image
-FROM python:3.10-slim
+# Use Python 3.11 to satisfy dependencies requiring Python >= 3.11
+FROM python:3.11-slim
 
 # Create a non-root user for security best practices
 RUN useradd -m -u 1000 user
@@ -12,7 +12,8 @@ WORKDIR $HOME/app
 
 # Copy requirements and install
 COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application files
 COPY --chown=user . .
