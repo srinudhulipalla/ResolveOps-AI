@@ -13,7 +13,7 @@ from PyPDF2 import PdfReader
 # Dynamically route the GOOGLE_API_KEY to GEMINI_API_KEY so ChromaDB can find it
 if not os.getenv("GEMINI_API_KEY") and os.getenv("GOOGLE_API_KEY"):
     os.environ["GEMINI_API_KEY"] = os.environ["GOOGLE_API_KEY"]
-    
+
 # 1. Setup Persistent Client
 CHROMA_PATH = "./chroma_data"
 client = chromadb.PersistentClient(path=CHROMA_PATH)
@@ -37,7 +37,7 @@ def ingest_documents():
     # Delete existing collection if we are rebuilding to avoid duplicates
     try:
         client.delete_collection(name="it_policies")
-    except ValueError:
+    except Exception:
         pass # Collection didn't exist yet, which is fine
 
     # Create fresh collection enforcing the Gemini Embedding Engine
